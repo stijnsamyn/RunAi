@@ -68,6 +68,38 @@
 <div class="wrap" id="app"><p style="text-align:center;color:#6b7280;padding:40px">Laden…</p></div>
 
 <script>
+/* ================= TOEGANGSCONTROLE ================= */
+const PW_HASH = "a8ec9107270f735b81a171e5bf17ad5d54b9505e6eabea714c3e6b751fdf432b";
+const PW_SALT = "runai-zout";
+const LS_UNLOCK = "runai_unlocked";
+async function sha256(s) {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
+  return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, "0")).join("");
+}
+function isUnlocked() { return localStorage.getItem(LS_UNLOCK) === PW_HASH; }
+async function tryUnlock() {
+  const pw = document.getElementById("pw").value;
+  if (await sha256(pw + PW_SALT) === PW_HASH) {
+    localStorage.setItem(LS_UNLOCK, PW_HASH);
+    boot();
+  } else {
+    document.getElementById("pwerr").textContent = "Onjuist wachtwoord.";
+  }
+}
+function renderLock() {
+  document.getElementById("app").innerHTML = `
+    <div class="setup card" style="text-align:center">
+      <h1>🏃 RunAi</h1>
+      <div class="sub">Deze pagina is beveiligd</div>
+      <label style="text-align:left">Wachtwoord</label>
+      <input id="pw" type="password" autocomplete="current-password" onkeydown="if(event.key==='Enter')tryUnlock()">
+      <div id="pwerr" style="color:#991b1b;font-size:13px;margin-top:8px"></div>
+      <button class="btn" onclick="tryUnlock()">Ontgrendelen</button>
+    </div>`;
+  document.getElementById("pw").focus();
+}
+window.tryUnlock = tryUnlock;
+
 /* ================= CONFIG & PLAN ================= */
 const PLAN = [
   { w: 1, focus: "Basis verstevigen", sessions: [
@@ -300,7 +332,7 @@ function render() {
 window.startAuth = startAuth; window.logout = logout; window.setCurrentWeek = setCurrentWeek;
 
 /* ================= BOOT ================= */
-(async function boot() {
+async function boot() {
   const params = new URLSearchParams(location.search);
   try {
     if (params.get("code")) {
@@ -314,7 +346,9 @@ window.startAuth = startAuth; window.logout = logout; window.setCurrentWeek = se
   } catch (e) {
     renderSetup(e.message || String(e));
   }
-})();
+}
+if (isUnlocked() || new URLSearchParams(location.search).get("code")) boot();
+else renderLock();
 </script>
 </body>
 </html>
