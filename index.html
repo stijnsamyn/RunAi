@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="RunAi">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
+<title>RunAi — Jouw weg naar 5 km</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.js"></script>
+<style>
+  :root { color-scheme: light; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: #f6f7f9; color: #1a1d21; padding: 16px; line-height: 1.45;
+    padding-top: calc(16px + env(safe-area-inset-top));
+  }
+  .wrap { max-width: 920px; margin: 0 auto; }
+  h1 { font-size: 21px; margin-bottom: 2px; }
+  .sub { color: #6b7280; font-size: 13px; margin-bottom: 16px; }
+  .grid { display: grid; gap: 12px; }
+  .cards4 { grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); }
+  .card { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 14px; }
+  .stat-label { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: #6b7280; }
+  .stat-value { font-size: 23px; font-weight: 700; margin-top: 4px; }
+  .stat-note { font-size: 12px; color: #9ca3af; margin-top: 2px; }
+  .reco { background: linear-gradient(135deg, #fc4c02, #e8420a); color: #fff; border-radius: 14px; padding: 18px; margin: 14px 0; }
+  .reco .tag { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; opacity: .85; }
+  .reco h2 { font-size: 18px; margin: 6px 0 8px; }
+  .reco p { font-size: 14px; opacity: .95; white-space: pre-line; }
+  .reco .why { margin-top: 10px; font-size: 12px; opacity: .8; font-style: italic; }
+  h3 { font-size: 15px; margin: 20px 0 10px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; color: #6b7280; font-weight: 600; font-size: 11px; text-transform: uppercase; padding: 8px; border-bottom: 1px solid #e5e7eb; }
+  td { padding: 8px; border-bottom: 1px solid #f1f3f5; }
+  tr:last-child td { border-bottom: none; }
+  .chartbox { height: 200px; position: relative; }
+  .weeks { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; }
+  .week { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 12px; cursor: pointer; }
+  .week.current { border: 2px solid #fc4c02; background: #fff7f3; }
+  .week.done { opacity: .55; }
+  .week h4 { font-size: 13px; margin-bottom: 6px; }
+  .week h4 .badge { font-size: 10px; background: #fc4c02; color: #fff; border-radius: 99px; padding: 2px 8px; margin-left: 6px; }
+  .week ul { list-style: none; font-size: 12px; color: #4b5563; }
+  .week li { padding: 3px 0; border-bottom: 1px dashed #f1f3f5; }
+  .week li:last-child { border-bottom: none; }
+  .week li b { color: #fc4c02; margin-right: 4px; }
+  .hint { font-size: 12px; color: #9ca3af; margin-top: 8px; }
+  .tips { font-size: 13px; color: #4b5563; }
+  .tips li { margin: 6px 0 6px 18px; }
+  .err { background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; padding: 14px; border-radius: 10px; font-size: 13px; margin-top: 12px; }
+  .setup { max-width: 480px; margin: 30px auto; }
+  .setup ol { margin: 12px 0 12px 20px; font-size: 13px; color: #4b5563; }
+  .setup li { margin: 8px 0; }
+  .setup label { display: block; font-size: 12px; font-weight: 600; margin: 12px 0 4px; }
+  .setup input { width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px; }
+  .btn { display: inline-block; background: #fc4c02; color: #fff; border: none; border-radius: 8px; padding: 12px 20px; font-size: 15px; font-weight: 600; cursor: pointer; margin-top: 16px; width: 100%; }
+  .btn.secondary { background: #e5e7eb; color: #374151; }
+  code { background: #f1f3f5; padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+  .topbar { display: flex; justify-content: space-between; align-items: baseline; }
+  .logout { font-size: 12px; color: #9ca3af; background: none; border: none; cursor: pointer; text-decoration: underline; }
+</style>
+</head>
+<body>
+<div class="wrap" id="app"><p style="text-align:center;color:#6b7280;padding:40px">Laden…</p></div>
+
+<script>
+/* ================= CONFIG & PLAN ================= */
+const PLAN = [
+  { w: 1, focus: "Basis verstevigen", sessions: [
+    { n: "A", day: 2, d: "3 × (8 min lopen / 2 min wandelen) — rustig conversatietempo" },
+    { n: "B", day: 4, d: "25 min heel rustig, wandelpauzes wanneer nodig" },
+    { n: "C", day: 6, d: "2 × (10 min lopen / 2 min wandelen)" } ]},
+  { w: 2, focus: "Langere blokken", sessions: [
+    { n: "A", day: 2, d: "2 × (12 min lopen / 2 min wandelen)" },
+    { n: "B", day: 4, d: "25 min heel rustig" },
+    { n: "C", day: 6, d: "20 min doorlopen zonder pauze" } ]},
+  { w: 3, focus: "Doorlopen", sessions: [
+    { n: "A", day: 2, d: "25 min doorlopen, rustig tempo" },
+    { n: "B", day: 4, d: "20 min rustig + 4 × 20 sec licht versnellen" },
+    { n: "C", day: 6, d: "28 min doorlopen" } ]},
+  { w: 4, focus: "Herstelweek 💤", sessions: [
+    { n: "A", day: 2, d: "20 min heel rustig" },
+    { n: "B", day: 4, d: "15 min heel rustig of stevige wandeling" },
+    { n: "C", day: 6, d: "25 min doorlopen" } ]},
+  { w: 5, focus: "Volume opbouwen", sessions: [
+    { n: "A", day: 2, d: "30 min doorlopen" },
+    { n: "B", day: 4, d: "20 min rustig + 4 × 20 sec versnellen" },
+    { n: "C", day: 6, d: "32 min doorlopen" } ]},
+  { w: 6, focus: "Richting 4,5 km", sessions: [
+    { n: "A", day: 2, d: "30 min doorlopen" },
+    { n: "B", day: 4, d: "25 min rustig" },
+    { n: "C", day: 6, d: "35 min of ± 4,5 km" } ]},
+  { w: 7, focus: "Testweek", sessions: [
+    { n: "A", day: 2, d: "35 min doorlopen" },
+    { n: "B", day: 4, d: "20 min heel rustig" },
+    { n: "C", day: 6, d: "5 km testloop op rustig tempo — tijd maakt niet uit!" } ]},
+  { w: 8, focus: "Doel: 5 km! 🎉", sessions: [
+    { n: "A", day: 2, d: "30 min rustig" },
+    { n: "B", day: 4, d: "20 min met 3 × 1 min vlot" },
+    { n: "C", day: 6, d: "5 km — jouw moment!" } ]},
+];
+const PLAN_START = "2026-07-06"; // maandag van week 1
+const LS = {
+  cid: "runai_client_id", csec: "runai_client_secret",
+  tok: "runai_tokens", anchor: "runai_plan_anchor"
+};
+
+/* ================= HELPERS ================= */
+function mondayOf(d) { const x = new Date(d); x.setHours(0,0,0,0); x.setDate(x.getDate() - (x.getDay()+6)%7); return x; }
+function iso(d) { return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
+function getAnchor() {
+  const s = localStorage.getItem(LS.anchor);
+  return s ? new Date(s+"T00:00:00") : new Date(PLAN_START+"T00:00:00");
+}
+function setCurrentWeek(w) {
+  const a = mondayOf(new Date()); a.setDate(a.getDate() - (w-1)*7);
+  localStorage.setItem(LS.anchor, iso(a)); render();
+}
+function currentWeek() {
+  const diff = Math.floor((mondayOf(new Date()) - getAnchor()) / 604800000);
+  return Math.min(Math.max(diff + 1, 1), PLAN.length);
+}
+function pace(avgSpeed) {
+  if (!avgSpeed) return "–";
+  const spk = 1000/avgSpeed, m = Math.floor(spk/60), s = Math.round(spk%60);
+  return m+":"+String(s).padStart(2,"0")+" /km";
+}
+function km(m) { return (m/1000).toFixed(2).replace(".",",")+" km"; }
+function fmtDate(d) { return d.toLocaleDateString("nl-BE",{weekday:"short",day:"numeric",month:"short"}); }
+function esc(s) { return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;"); }
+
+/* ================= STRAVA AUTH ================= */
+function creds() { return { id: localStorage.getItem(LS.cid), secret: localStorage.getItem(LS.csec) }; }
+function tokens() { try { return JSON.parse(localStorage.getItem(LS.tok)); } catch { return null; } }
+
+async function tokenRequest(params) {
+  const c = creds();
+  const body = new URLSearchParams({ client_id: c.id, client_secret: c.secret, ...params });
+  const r = await fetch("https://www.strava.com/api/v3/oauth/token", { method: "POST", body });
+  if (!r.ok) throw new Error("Strava-login mislukt (HTTP "+r.status+"). Controleer je Client ID/Secret.");
+  const j = await r.json();
+  localStorage.setItem(LS.tok, JSON.stringify({ access: j.access_token, refresh: j.refresh_token, exp: j.expires_at }));
+  return j;
+}
+async function getAccessToken() {
+  let t = tokens();
+  if (!t) return null;
+  if (t.exp * 1000 < Date.now() + 60000) {
+    await tokenRequest({ grant_type: "refresh_token", refresh_token: t.refresh });
+    t = tokens();
+  }
+  return t.access;
+}
+function startAuth() {
+  const id = document.getElementById("cid").value.trim();
+  const sec = document.getElementById("csec").value.trim();
+  if (!id || !sec) { alert("Vul beide velden in."); return; }
+  localStorage.setItem(LS.cid, id); localStorage.setItem(LS.csec, sec);
+  const redirect = location.origin + location.pathname;
+  location.href = "https://www.strava.com/oauth/authorize?client_id=" + id +
+    "&redirect_uri=" + encodeURIComponent(redirect) +
+    "&response_type=code&approval_prompt=auto&scope=activity:read_all";
+}
+function logout() { localStorage.removeItem(LS.tok); render(); }
+
+/* ================= DATA ================= */
+let RUNS = [];
+async function loadRuns() {
+  const at = await getAccessToken();
+  const r = await fetch("https://www.strava.com/api/v3/athlete/activities?per_page=100", {
+    headers: { Authorization: "Bearer " + at } });
+  if (r.status === 401) { localStorage.removeItem(LS.tok); throw new Error("Sessie verlopen — log opnieuw in."); }
+  if (!r.ok) throw new Error("Kon activiteiten niet ophalen (HTTP "+r.status+").");
+  const acts = await r.json();
+  RUNS = acts.filter(a => (a.sport_type || a.type) === "Run")
+    .map(a => ({ name: a.name, date: new Date(a.start_date_local.replace("Z","")),
+      dist: a.distance, time: a.moving_time, speed: a.average_speed }))
+    .sort((a,b) => b.date - a.date);
+}
+
+/* ================= LOGIC ================= */
+function weekStats() {
+  const mon = mondayOf(new Date());
+  const tw = RUNS.filter(r => r.date >= mon);
+  return { count: tw.length, dist: tw.reduce((s,r)=>s+r.dist,0), last: RUNS[0]||null };
+}
+function recommendation() {
+  const wk = currentWeek(), plan = PLAN[wk-1], st = weekStats();
+  const today = new Date(); today.setHours(0,0,0,0);
+  let daysSince = 99;
+  if (st.last) { const d = new Date(st.last.date); d.setHours(0,0,0,0); daysSince = Math.round((today-d)/86400000); }
+  const dow = new Date().getDay(); // 0=zo
+  const todaySession = plan.sessions.find(s => s.day === dow);
+
+  if (st.count >= 3) return { title: "Week "+wk+" volbracht! 🎉",
+    body: "Je 3 sessies van deze week zitten erop. Rust of een lichte wandeling — herstel maakt je sterker.",
+    why: "3 van 3 sessies gelogd deze week." };
+  if (daysSince === 0) {
+    const next = plan.sessions[Math.min(st.count,2)];
+    return { title: "Vandaag al gelopen — rust! 💤",
+      body: "Mooi werk vandaag. Volgende sessie ("+next.n+"): "+next.d,
+      why: "Minstens 1 rustdag tussen loopsessies beschermt je scheenbenen." };
+  }
+  if (todaySession) return { title: "Vandaag: sessie "+todaySession.n+" 🏃",
+    body: todaySession.d+"\n\nStart met 5 min stevig wandelen, sluit af met 5 min wandelen.",
+    why: "Week "+wk+" ("+plan.focus+") — loopdag volgens je schema (di/do/za)." };
+  const next = plan.sessions[Math.min(st.count,2)];
+  return { title: "Rustdag 💤",
+    body: "Vandaag geen loopdag. Volgende sessie ("+next.n+", "+["zo","ma","di","wo","do","vr","za"][next.day]+"): "+next.d+"\n\nRustig fietsen, roeien of wandelen mag altijd.",
+    why: "Week "+wk+" ("+plan.focus+") — "+st.count+" van 3 sessies gelopen." };
+}
+function weeklySeries() {
+  const map = new Map();
+  RUNS.forEach(r => { const k = iso(mondayOf(r.date)); map.set(k, (map.get(k)||0)+r.dist); });
+  const out = [], start = mondayOf(new Date());
+  for (let i = 9; i >= 0; i--) {
+    const d = new Date(start); d.setDate(d.getDate()-i*7);
+    out.push({ label: d.toLocaleDateString("nl-BE",{day:"numeric",month:"short"}), km: (map.get(iso(d))||0)/1000 });
+  }
+  return out;
+}
+
+/* ================= VIEWS ================= */
+function renderSetup(msg) {
+  document.getElementById("app").innerHTML = `
+    <div class="setup card">
+      <h1>🏃 RunAi</h1>
+      <div class="sub">Eenmalige koppeling met jouw Strava-account</div>
+      ${msg ? '<div class="err">'+esc(msg)+"</div>" : ""}
+      <ol>
+        <li>Ga naar <b>strava.com/settings/api</b> en maak een app aan (categorie: Training).</li>
+        <li>Vul bij <b>Authorization Callback Domain</b> exact dit in: <code>${location.hostname || "localhost"}</code></li>
+        <li>Kopieer hieronder je <b>Client ID</b> en <b>Client Secret</b>.</li>
+      </ol>
+      <label>Client ID</label><input id="cid" inputmode="numeric" value="${esc(localStorage.getItem(LS.cid)||"")}">
+      <label>Client Secret</label><input id="csec" type="password" value="${esc(localStorage.getItem(LS.csec)||"")}">
+      <button class="btn" onclick="startAuth()">Verbinden met Strava</button>
+      <p class="hint">Je gegevens blijven in je eigen browser (localStorage) en gaan nergens anders naartoe.</p>
+    </div>`;
+}
+
+function render() {
+  const wk = currentWeek(), st = weekStats(), reco = recommendation();
+  const longest = RUNS.length ? Math.max(...RUNS.map(r=>r.dist)) : 0;
+  document.getElementById("app").innerHTML = `
+    <div class="topbar"><div><h1>🏃 RunAi — Jouw weg naar 5 km</h1>
+    <div class="sub">3 sessies/week (di · do · za) · week ${wk} van 8</div></div>
+    <button class="logout" onclick="logout()">uitloggen</button></div>
+
+    <div class="grid cards4">
+      <div class="card"><div class="stat-label">Deze week</div><div class="stat-value">${st.count}/3</div><div class="stat-note">sessies</div></div>
+      <div class="card"><div class="stat-label">Km deze week</div><div class="stat-value">${(st.dist/1000).toFixed(1).replace(".",",")}</div><div class="stat-note">kilometer</div></div>
+      <div class="card"><div class="stat-label">Langste loop</div><div class="stat-value">${(longest/1000).toFixed(1).replace(".",",")}</div><div class="stat-note">kilometer</div></div>
+      <div class="card"><div class="stat-label">Laatste tempo</div><div class="stat-value" style="font-size:18px">${st.last?pace(st.last.speed):"–"}</div><div class="stat-note">${st.last?fmtDate(st.last.date):""}</div></div>
+    </div>
+
+    <div class="reco"><div class="tag">Aanbeveling</div><h2>${reco.title}</h2><p>${reco.body}</p><div class="why">${reco.why}</div></div>
+
+    <h3>📊 Kilometers per week</h3>
+    <div class="card chartbox"><canvas id="chart"></canvas></div>
+
+    <h3>📅 Jouw 8-wekenplan <span style="font-weight:400;font-size:12px;color:#9ca3af">(tik op een week om ze als huidige in te stellen)</span></h3>
+    <div class="weeks">${PLAN.map(p=>`
+      <div class="week ${p.w===wk?"current":p.w<wk?"done":""}" onclick="setCurrentWeek(${p.w})">
+        <h4>Week ${p.w} — ${p.focus}${p.w===wk?'<span class="badge">NU</span>':""}</h4>
+        <ul>${p.sessions.map(s=>`<li><b>${s.n}</b>${s.d}</li>`).join("")}</ul>
+      </div>`).join("")}
+    </div>
+
+    <h3>🕐 Recente loopjes</h3>
+    <div class="card" style="padding:4px 0;overflow-x:auto"><table>
+      <thead><tr><th>Datum</th><th>Naam</th><th>Afstand</th><th>Tempo</th></tr></thead>
+      <tbody>${RUNS.slice(0,8).map(r=>`<tr><td>${fmtDate(r.date)}</td><td>${esc(r.name)}</td><td>${km(r.dist)}</td><td>${pace(r.speed)}</td></tr>`).join("")}</tbody>
+    </table></div>
+
+    <h3>💡 Tips</h3>
+    <div class="card tips"><ul>
+      <li><b>Scheenbenen:</b> verhoog je weekvolume nooit met meer dan ±10%; bij pijn een extra rustdag.</li>
+      <li><b>Cadans:</b> kortere, snellere pasjes (richting 160–170 stappen/min) verlagen de belasting.</li>
+      <li><b>Tempo:</b> rustige sessies écht rustig — je moet kunnen praten tijdens het lopen.</li>
+      <li><b>Rust:</b> geen twee loopdagen na elkaar; roeien of fietsen op rustdagen mag.</li>
+    </ul></div>
+    <p class="hint">Tip voor iPhone: open deze pagina in Safari → deel-knop → "Zet op beginscherm" voor een app-icoon.</p>`;
+
+  const s = weeklySeries();
+  new Chart(document.getElementById("chart"), {
+    type: "bar",
+    data: { labels: s.map(x=>x.label), datasets: [{ data: s.map(x=>x.km),
+      backgroundColor: s.map((x,i)=>i===s.length-1?"#fc4c02":"#fcae8c"), borderRadius: 6 }] },
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: { y: { beginAtZero: true, title: { display: true, text: "km" } } } }
+  });
+}
+
+window.startAuth = startAuth; window.logout = logout; window.setCurrentWeek = setCurrentWeek;
+
+/* ================= BOOT ================= */
+(async function boot() {
+  const params = new URLSearchParams(location.search);
+  try {
+    if (params.get("code")) {
+      await tokenRequest({ grant_type: "authorization_code", code: params.get("code") });
+      history.replaceState({}, "", location.pathname);
+    }
+    if (params.get("error")) { renderSetup("Strava-toegang geweigerd. Probeer opnieuw."); return; }
+    if (!creds().id || !tokens()) { renderSetup(); return; }
+    await loadRuns();
+    render();
+  } catch (e) {
+    renderSetup(e.message || String(e));
+  }
+})();
+</script>
+</body>
+</html>
